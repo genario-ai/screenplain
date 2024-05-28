@@ -1,9 +1,11 @@
 # Copyright (c) 2014 Martin Vilcans
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license.php
+import os
 
 from screenplain import types
 from screenplain.types import Action, Dialog, DualDialog, Transition, Slug
+import reportlab
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
@@ -26,15 +28,19 @@ try:
 except ImportError:
     sys.stderr.write("ERROR: ReportLab is required for PDF output\n")
     raise
-del reportlab
+# del reportlab
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class MultiFontParagraph(Paragraph):
     # Created by B8Vrede for http://stackoverflow.com/questions/35172207/
     def __init__(self, text, style):
+        if str(BASE_DIR) + "/export/fonts" not in reportlab.rl_config.TTFSearchPath:
+            reportlab.rl_config.TTFSearchPath.append(str(BASE_DIR) + "/export/fonts")
 
         font_list = []
-        fonts_locations = [("Noto", "../fonts/NotoSans-VariableFont_wdth,wght.ttf")]
+        fonts_locations = [("Noto", "NotoSans-VariableFont_wdth,wght.ttf")]
         for font_name, font_location in fonts_locations:
             # Load the font
             font = TTFont(font_name, font_location)
@@ -256,7 +262,9 @@ class DocTemplate(BaseDocTemplate):
 
 
 def add_paragraph(story, para, style):
-    story.append(MultiFontParagraph("<br/>".join(line.to_html() for line in para.lines), style))
+    story.append(
+        MultiFontParagraph("<br/>".join(line.to_html() for line in para.lines), style)
+    )
 
 
 def add_slug(story, para, style, is_strong):
