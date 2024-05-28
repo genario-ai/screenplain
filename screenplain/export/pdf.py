@@ -38,6 +38,7 @@ class MultiFontParagraph(Paragraph):
     def __init__(self, text, style):
         if str(BASE_DIR) + "/export/fonts" not in reportlab.rl_config.TTFSearchPath:
             reportlab.rl_config.TTFSearchPath.append(str(BASE_DIR) + "/export/fonts")
+        print("YOOOOLO : ", reportlab.rl_config.TTFSearchPath)
 
         font_list = []
         fonts_locations = [("Noto", "NotoSans-VariableFont_wdth,wght.ttf")]
@@ -139,7 +140,7 @@ class Settings:
 
         default_style = ParagraphStyle(
             "default",
-            fontName="Courier",
+            fontName="NotoSans",
             fontSize=font_size,
             leading=line_height,
             spaceBefore=0,
@@ -263,7 +264,7 @@ class DocTemplate(BaseDocTemplate):
 
 def add_paragraph(story, para, style):
     story.append(
-        MultiFontParagraph("<br/>".join(line.to_html() for line in para.lines), style)
+        Paragraph("<br/>".join(line.to_html() for line in para.lines), style)
     )
 
 
@@ -273,20 +274,20 @@ def add_slug(story, para, style, is_strong):
             html = "<b><u>" + line.to_html() + "</u></b>"
         else:
             html = line.to_html()
-        story.append(MultiFontParagraph(html, style))
+        story.append(Paragraph(html, style))
 
 
 def add_dialog(story, dialog, settings: Settings):
     story.append(
-        MultiFontParagraph(dialog.character.to_html(), settings.character_style)
+        Paragraph(dialog.character.to_html(), settings.character_style)
     )
     for parenthetical, line in dialog.blocks:
         if parenthetical:
             story.append(
-                MultiFontParagraph(line.to_html(), settings.parenthentical_style)
+                Paragraph(line.to_html(), settings.parenthentical_style)
             )
         else:
-            story.append(MultiFontParagraph(line.to_html(), settings.dialog_style))
+            story.append(Paragraph(line.to_html(), settings.dialog_style))
 
 
 def add_dual_dialog(story, dual, settings: Settings):
@@ -314,7 +315,7 @@ def get_title_page_story(screenplay, settings):
         total_height = 0
         for line in lines:
             html = line.to_html()
-            para = MultiFontParagraph(html, style)
+            para = Paragraph(html, style)
             width, height = para.wrap(settings.frame_width, settings.frame_height)
             story.append(para)
             total_height += height
