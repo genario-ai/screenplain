@@ -3,12 +3,12 @@
 # http://www.opensource.org/licenses/mit-license.php
 
 from screenplain import types
-from screenplain.types import (
-    Action, Dialog, DualDialog, Transition, Slug
-)
+from screenplain.types import Action, Dialog, DualDialog, Transition, Slug
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab import platypus
 from reportlab.platypus import (
     BaseDocTemplate,
@@ -24,9 +24,48 @@ import sys
 try:
     import reportlab
 except ImportError:
-    sys.stderr.write('ERROR: ReportLab is required for PDF output\n')
+    sys.stderr.write("ERROR: ReportLab is required for PDF output\n")
     raise
 del reportlab
+
+
+class MultiFontParagraph(Paragraph):
+    # Created by B8Vrede for http://stackoverflow.com/questions/35172207/
+    def __init__(self, text, style):
+
+        font_list = []
+        fonts_locations = [("Noto", "../fonts/NotoSans-VariableFont_wdth,wght.ttf")]
+        for font_name, font_location in fonts_locations:
+            # Load the font
+            font = TTFont(font_name, font_location)
+
+            # Get the char width of all known symbols
+            font_widths = font.face.charWidths
+
+            # Register the font to able it use
+            pdfmetrics.registerFont(font)
+
+            # Store the font and info in a list for lookup
+            font_list.append((font_name, font_widths))
+
+        # Set up the string to hold the new text
+        new_text = ""
+
+        # Loop through the string
+        for char in text:
+
+            # Loop through the fonts
+            for font_name, font_widths in font_list:
+
+                # Check whether this font know the width of the character
+                # If so it has a Glyph for it so use it
+                if ord(char) in font_widths:
+
+                    # Set the working font for the current character
+                    new_text += '<font name="{}">{}</font>'.format(font_name, char)
+                    break
+
+        Paragraph.__init__(self, new_text, style)
 
 
 def create_default_settings():
@@ -86,21 +125,15 @@ class Settings:
         self.frame_width = self.characters_per_line * self.character_width
         [self.page_width, self.page_height] = page_size
         self.left_margin = 1.5 * inch
-        self.right_margin = self.page_width - (
-            self.left_margin + self.frame_width
-        )
+        self.right_margin = self.page_width - (self.left_margin + self.frame_width)
         self.top_margin = 1 * inch
-        self.bottom_margin = self.page_height - (
-            self.top_margin + self.frame_height
-        )
-        self.title_frame_width = self.page_width - (
-            self.left_margin + self.left_margin
-        )
+        self.bottom_margin = self.page_height - (self.top_margin + self.frame_height)
+        self.title_frame_width = self.page_width - (self.left_margin + self.left_margin)
         self.strong_slugs = strong_slugs
 
         default_style = ParagraphStyle(
-            'default',
-            fontName='Courier',
+            "default",
+            fontName="Courier",
             fontSize=font_size,
             leading=line_height,
             spaceBefore=0,
@@ -111,91 +144,103 @@ class Settings:
         self.default_style = default_style
 
         self.centered_style = ParagraphStyle(
-            'default-centered', self.default_style,
+            "default-centered",
+            self.default_style,
             alignment=TA_CENTER,
         )
 
         self.character_style = ParagraphStyle(
-            'character', default_style,
+            "character",
+            default_style,
             spaceBefore=line_height,
             leftIndent=19 * self.character_width,
             keepWithNext=1,
         )
         self.dialog_style = ParagraphStyle(
-            'dialog', default_style,
+            "dialog",
+            default_style,
             leftIndent=9 * self.character_width,
             rightIndent=self.frame_width - (45 * self.character_width),
         )
         self.parenthentical_style = ParagraphStyle(
-            'parenthentical', default_style,
+            "parenthentical",
+            default_style,
             leftIndent=13 * self.character_width,
             keepWithNext=1,
         )
         self.action_style = ParagraphStyle(
-            'action', default_style,
+            "action",
+            default_style,
             spaceBefore=line_height,
         )
         self.centered_action_style = ParagraphStyle(
-            'centered-action', self.action_style,
+            "centered-action",
+            self.action_style,
             alignment=TA_CENTER,
         )
         self.slug_style = ParagraphStyle(
-            'slug', default_style,
+            "slug",
+            default_style,
             spaceBefore=line_height,
             spaceAfter=line_height,
             keepWithNext=1,
         )
         self.transition_style = ParagraphStyle(
-            'transition', default_style,
+            "transition",
+            default_style,
             spaceBefore=line_height,
             spaceAfter=line_height,
             alignment=TA_RIGHT,
         )
 
         self.title_style = ParagraphStyle(
-            'title', default_style,
-            fontSize=font_size * 2, leading=font_size * 3,
+            "title",
+            default_style,
+            fontSize=font_size * 2,
+            leading=font_size * 3,
             alignment=TA_CENTER,
         )
         self.contact_style = ParagraphStyle(
-            'contact', default_style,
+            "contact",
+            default_style,
         )
 
 
 class DocTemplate(BaseDocTemplate):
     def __init__(self, *args, **kwargs):
-        self.settings = (
-            kwargs.pop('settings', None) or create_default_settings()
-        )
-        self.has_title_page = kwargs.pop('has_title_page', False)
+        self.settings = kwargs.pop("settings", None) or create_default_settings()
+        self.has_title_page = kwargs.pop("has_title_page", False)
         frame = Frame(
             self.settings.left_margin,
             self.settings.bottom_margin,
             self.settings.frame_width,
             self.settings.frame_height,
-            id='normal',
-            leftPadding=0, topPadding=0, rightPadding=0, bottomPadding=0
+            id="normal",
+            leftPadding=0,
+            topPadding=0,
+            rightPadding=0,
+            bottomPadding=0,
         )
         title_frame = Frame(
             self.settings.left_margin,
             self.settings.bottom_margin,
             self.settings.title_frame_width,
             self.settings.frame_height,
-            id='title',
-            leftPadding=0, topPadding=0, rightPadding=0, bottomPadding=0
+            id="title",
+            leftPadding=0,
+            topPadding=0,
+            rightPadding=0,
+            bottomPadding=0,
         )
         pageTemplates = [
-            PageTemplate(id='title', frames=[title_frame]),
-            PageTemplate(id='standard', frames=[frame])
+            PageTemplate(id="title", frames=[title_frame]),
+            PageTemplate(id="standard", frames=[frame]),
         ]
-        BaseDocTemplate.__init__(
-            self, pageTemplates=pageTemplates, *args, **kwargs
-        )
+        BaseDocTemplate.__init__(self, pageTemplates=pageTemplates, *args, **kwargs)
 
     def handle_pageBegin(self):
         self.canv.setFont(
-            'Courier', self.settings.font_size,
-            leading=self.settings.line_height
+            "Courier", self.settings.font_size, leading=self.settings.line_height
         )
         if self.has_title_page:
             page = self.page  # self.page is 0 on first page
@@ -205,40 +250,35 @@ class DocTemplate(BaseDocTemplate):
             self.canv.drawRightString(
                 self.settings.left_margin + self.settings.frame_width,
                 self.settings.page_height - 42,
-                '%s.' % page
+                "%s." % page,
             )
         self._handle_pageBegin()
 
 
 def add_paragraph(story, para, style):
-    story.append(Paragraph(
-        '<br/>'.join(line.to_html() for line in para.lines),
-        style
-    ))
+    story.append(MultiFontParagraph("<br/>".join(line.to_html() for line in para.lines), style))
 
 
 def add_slug(story, para, style, is_strong):
     for line in para.lines:
         if is_strong:
-            html = '<b><u>' + line.to_html() + '</u></b>'
+            html = "<b><u>" + line.to_html() + "</u></b>"
         else:
             html = line.to_html()
-        story.append(Paragraph(html, style))
+        story.append(MultiFontParagraph(html, style))
 
 
 def add_dialog(story, dialog, settings: Settings):
     story.append(
-        Paragraph(dialog.character.to_html(), settings.character_style)
+        MultiFontParagraph(dialog.character.to_html(), settings.character_style)
     )
     for parenthetical, line in dialog.blocks:
         if parenthetical:
             story.append(
-                Paragraph(line.to_html(), settings.parenthentical_style)
+                MultiFontParagraph(line.to_html(), settings.parenthentical_style)
             )
         else:
-            story.append(
-                Paragraph(line.to_html(), settings.dialog_style)
-            )
+            story.append(MultiFontParagraph(line.to_html(), settings.dialog_style))
 
 
 def add_dual_dialog(story, dual, settings: Settings):
@@ -248,9 +288,7 @@ def add_dual_dialog(story, dual, settings: Settings):
 
 
 def get_title_page_story(screenplay, settings):
-    """Get Platypus flowables for the title page
-
-    """
+    """Get Platypus flowables for the title page"""
     # From Fountain spec:
     # The recommendation is that Title, Credit, Author (or Authors, either
     # is a valid key syntax), and Source will be centered on the page in
@@ -268,52 +306,53 @@ def get_title_page_story(screenplay, settings):
         total_height = 0
         for line in lines:
             html = line.to_html()
-            para = Paragraph(html, style)
-            width, height = para.wrap(
-                settings.frame_width, settings.frame_height
-            )
+            para = MultiFontParagraph(html, style)
+            width, height = para.wrap(settings.frame_width, settings.frame_height)
             story.append(para)
             total_height += height
         return space_before + total_height
 
     title_story = []
-    title_height = sum((
-        add_lines(title_story, 'Title', settings.title_style),
-        add_lines(
-            title_story,
-            'Credit',
-            settings.centered_style,
-            space_before=settings.line_height
-        ),
-        add_lines(title_story, 'Author', settings.centered_style),
-        add_lines(title_story, 'Authors', settings.centered_style),
-        add_lines(title_story, 'Source', settings.centered_style),
-    ))
+    title_height = sum(
+        (
+            add_lines(title_story, "Title", settings.title_style),
+            add_lines(
+                title_story,
+                "Credit",
+                settings.centered_style,
+                space_before=settings.line_height,
+            ),
+            add_lines(title_story, "Author", settings.centered_style),
+            add_lines(title_story, "Authors", settings.centered_style),
+            add_lines(title_story, "Source", settings.centered_style),
+        )
+    )
 
     lower_story = []
-    lower_height = sum((
-        add_lines(lower_story, 'Draft date', settings.default_style),
-        add_lines(
-            lower_story,
-            'Contact',
-            settings.contact_style,
-            space_before=settings.line_height
-        ),
-        add_lines(
-            lower_story,
-            'Copyright',
-            settings.centered_style,
-            space_before=settings.line_height
-        ),
-    ))
+    lower_height = sum(
+        (
+            add_lines(lower_story, "Draft date", settings.default_style),
+            add_lines(
+                lower_story,
+                "Contact",
+                settings.contact_style,
+                space_before=settings.line_height,
+            ),
+            add_lines(
+                lower_story,
+                "Copyright",
+                settings.centered_style,
+                space_before=settings.line_height,
+            ),
+        )
+    )
 
     if not title_story and not lower_story:
         return []
 
     story = []
     top_space = min(
-        settings.frame_height / 3.0,
-        settings.frame_height - lower_height - title_height
+        settings.frame_height / 3.0, settings.frame_height - lower_height - title_height
     )
     if top_space > 0:
         story.append(Spacer(settings.frame_width, top_space))
@@ -326,16 +365,14 @@ def get_title_page_story(screenplay, settings):
         story.append(Spacer(settings.frame_width, middle_space))
     story += lower_story
 
-    story.append(NextPageTemplate('standard'))
+    story.append(NextPageTemplate("standard"))
 
     story.append(platypus.PageBreak())
     return story
 
 
 def to_pdf(
-    screenplay, output_filename,
-    template_constructor=DocTemplate,
-    settings=None
+    screenplay, output_filename, template_constructor=DocTemplate, settings=None
 ):
     settings = settings or create_default_settings()
     story = get_title_page_story(screenplay, settings)
@@ -348,10 +385,13 @@ def to_pdf(
             add_dual_dialog(story, para, settings)
         elif isinstance(para, Action):
             add_paragraph(
-                story, para,
-                settings.centered_action_style
-                if para.centered
-                else settings.action_style
+                story,
+                para,
+                (
+                    settings.centered_action_style
+                    if para.centered
+                    else settings.action_style
+                ),
             )
         elif isinstance(para, Slug):
             add_slug(story, para, settings.slug_style, settings.strong_slugs)
@@ -367,6 +407,6 @@ def to_pdf(
         output_filename,
         pagesize=(settings.page_width, settings.page_height),
         settings=settings,
-        has_title_page=has_title_page
+        has_title_page=has_title_page,
     )
     doc.build(story)
